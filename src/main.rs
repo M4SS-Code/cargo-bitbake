@@ -29,14 +29,16 @@ use cargo::{CliResult, Config};
 use itertools::Itertools;
 use std::default::Default;
 use std::env;
+use std::fs::File;
 use std::fs::OpenOptions;
+use std::io;
 use std::io::Write;
+use std::path::Path;
 use std::path::PathBuf;
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
 
 mod git;
-mod license;
 
 const CRATES_IO_URL: &str = "crates.io";
 
@@ -317,38 +319,31 @@ fn real_main(options: Args, config: &mut Config) -> CliResult {
         )?
         .trim();
 
-    // package license
-    let license = metadata.license.as_ref().map_or_else(
-        || {
-            println!("No package.license set in your Cargo.toml, trying package.license_file");
-            metadata.license_file.as_ref().map_or_else(
-                || {
-                    println!("No package.license_file set in your Cargo.toml");
-                    println!("Assuming {} license", license::CLOSED_LICENSE);
-                    license::CLOSED_LICENSE
-                },
-                |s| s.as_str(),
-            )
-        },
-        |s| s.as_str(),
-    );
+    fn file_md5<P: AsRef<Path>>(license_file: P) -> Result<String, io::Error> {
+        let mut file = File::open(license_file)?;
+        let mut context = md5::Context::new();
 
-    // compute the relative directory into the repo our Cargo.toml is at
-    let rel_dir = md.rel_dir()?;
-
-    // license files for the package
-    let mut lic_files = vec![];
-    let licenses: Vec<&str> = license.split('/').collect();
-    let single_license = licenses.len() == 1;
-    for lic in licenses {
-        lic_files.push(format!(
-            "    {}",
-            license::file(crate_root, &rel_dir, lic, single_license)
-        ));
+        io::copy(&mut file, &mut context)?;
+        Ok(format!("{:x}", context.compute()))
     }
 
-    // license data in Yocto fmt
-    let license = license.split('/').map(|f| f.trim()).join(" | ");
+    let license = metadata
+        .license
+        .as_deref()
+        .expect("missing license_file in Cargo.toml");
+    let license_file = metadata
+        .license_file
+        .as_deref()
+        .expect("missing license_file in Cargo.toml");
+
+    let license_file_md5 = file_md5(license_file).expect("read license_file and generate md5");
+
+    let lic_files = vec![format!(
+        "    file://{};md5={} \\\n",
+        license_file, license_file_md5
+    )];
+
+    let rel_dir = md.rel_dir()?;
 
     // attempt to figure out the git repo for this project
     let project_repo = git::ProjectRepo::new(config).unwrap_or_else(|e| {

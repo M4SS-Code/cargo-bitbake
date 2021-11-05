@@ -21,7 +21,7 @@ SRC_URI += " \
 {src_uri_extras}
 
 # FIXME: update generateme with the real MD5 of the license file
-LIC_FILES_CHKSUM = " \
+LIC_FILES_CHKSUM = "\
 {lic_files}"
 
 SUMMARY = "{summary}"
