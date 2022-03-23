@@ -10,12 +10,12 @@
 
 extern crate anyhow;
 extern crate cargo;
+extern crate clap;
 extern crate git2;
 extern crate itertools;
 extern crate lazy_static;
 extern crate md5;
 extern crate regex;
-extern crate structopt;
 
 use anyhow::{anyhow, Context as _};
 use cargo::core::registry::PackageRegistry;
@@ -26,6 +26,7 @@ use cargo::core::{Package, PackageSet, Resolve, Workspace};
 use cargo::ops;
 use cargo::util::{important_paths, CargoResult};
 use cargo::{CliResult, Config};
+use clap::Parser;
 use itertools::Itertools;
 use std::default::Default;
 use std::env;
@@ -33,10 +34,7 @@ use std::fs::File;
 use std::fs::OpenOptions;
 use std::io;
 use std::io::Write;
-use std::path::Path;
-use std::path::PathBuf;
-use structopt::clap::AppSettings;
-use structopt::StructOpt;
+use std::path::{Path, PathBuf};
 
 mod git;
 
@@ -128,38 +126,41 @@ impl<'cfg> PackageInfo<'cfg> {
     }
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct Args {
     /// Silence all output
-    #[structopt(short = "q")]
+    #[clap(short = 'q')]
     quiet: bool,
 
     /// Verbose mode (-v, -vv, -vvv, etc.)
-    #[structopt(short = "v", parse(from_occurrences))]
+    #[clap(short = 'v', parse(from_occurrences))]
     verbose: usize,
 
     /// Reproducible mode: Output exact git references for git projects
-    #[structopt(short = "R")]
+    #[clap(short = 'R')]
     reproducible: bool,
+
+    /// Legacy Overrides: Use legacy override syntax
+    #[clap(short = 'l', long = "legacy-overrides")]
+    legacy_overrides: bool,
 }
 
-#[derive(StructOpt, Debug)]
-#[structopt(
+#[derive(Parser, Debug)]
+#[clap(
     name = "cargo-bitbake",
     bin_name = "cargo",
     author,
-    about = "Generates a BitBake recipe for a given Cargo project",
-    global_settings(&[AppSettings::ColoredHelp])
+    about = "Generates a BitBake recipe for a given Cargo project"
 )]
 enum Opt {
     /// Generates a BitBake recipe for a given Cargo project
-    #[structopt(name = "bitbake")]
+    #[clap(name = "bitbake")]
     Bitbake(Args),
 }
 
 fn main() {
     let mut config = Config::default().unwrap();
-    let Opt::Bitbake(opt) = Opt::from_args();
+    let Opt::Bitbake(opt) = Opt::parse();
     let result = real_main(opt, &mut config);
     if let Err(e) = result {
         cargo::exit_with_error(e, &mut *config.shell());
