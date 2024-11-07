@@ -306,7 +306,7 @@ fn real_main(options: Args, config: &mut GlobalContext) -> CliResult {
                 src_uri_extras.push(format!("SRCREV_{} = \"{}\"", pkg.name(), rev));
                 // instruct Cargo where to find this
                 src_uri_extras.push(format!(
-                    "EXTRA_OECARGO_PATHS += \"${{WORKDIR}}/{}\"",
+                    "EXTRA_OECARGO_PATHS += \"${{UNPACKDIR}}/{}\"",
                     pkg.name()
                 ));
 
